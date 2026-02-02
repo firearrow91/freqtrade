@@ -1,0 +1,127 @@
+{
+    "$schema": "https://schema.freqtrade.io/schema.json",
+    "trading_mode": "futures",
+    "margin_mode": "isolated",
+    "max_open_trades": 2,
+    "stake_currency": "USDT",
+    "stake_amount": "unlimited",
+    "tradable_balance_ratio": 0.99,
+    "fiat_display_currency": "USD",
+    "dry_run": true,
+    "dry_run_wallet": 1000,
+    "timeframe": "5m",
+    "cancel_open_orders_on_exit": true,
+    "unfilledtimeout": {
+        "entry": 10,
+        "exit": 10,
+        "unit": "minutes"
+    },
+    "entry_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1,
+        "price_last_balance": 0.0,
+        "check_depth_of_market": {
+            "enabled": false,
+            "bids_to_ask_delta": 1
+        }
+    },
+    "exit_pricing": {
+        "price_side": "other",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "order_types": {
+        "entry": "limit",
+        "exit": "limit",
+        "emergency_exit": "market",
+        "force_exit": "market",
+        "force_entry": "market",
+        "stoploss": "market",
+        "stoploss_on_exchange": true,
+        "stoploss_on_exchange_interval": 60
+    },
+    "exchange": {
+        "name": "bitget",
+        "key": "",
+        "secret": "",
+        "password": "",
+        "ccxt_config": {},
+        "ccxt_async_config": {},
+        "pair_whitelist": [
+            "BTC/USDT:USDT",
+            "ETH/USDT:USDT"
+        ],
+        "pair_blacklist": []
+    },
+    "pairlists": [
+        {
+            "method": "StaticPairList"
+        }
+    ],
+    "telegram": {
+        "enabled": false,
+        "token": "",
+        "chat_id": ""
+    },
+    "bot_name": "freqai_test_bot",
+    "initial_state": "running",
+    "force_entry_enable": true,
+    "internals": {
+        "process_throttle_secs": 5,
+        "heartbeat_interval": 60
+    },
+    "strategy": "FreqaiMLFirstStrategy",
+    "strategy_path": "user_data/strategies/",
+    "dataformat_ohlcv": "feather",
+    "dataformat_trades": "feather",
+    "freqai": {
+        "enabled": true,
+        "purge_old_models": 2,
+        "train_period_days": 21,
+        "backtest_period_days": 3,
+        "identifier": "ml-extrema-tuned-v4",
+        "feature_parameters": {
+            "include_timeframes": [
+                "5m",
+                "15m",
+                "1h"
+            ],
+            "include_corr_pairlist": [
+                "BTC/USDT:USDT",
+                "ETH/USDT:USDT",
+                "SOL/USDT:USDT"
+            ],
+            "label_period_candles": 20,
+            "include_shifted_candles": 3,
+            "DI_threshold": 0.7,
+            "weight_factor": 0.95,
+            "buffer_train_data_candles": 20,
+            "noise_standard_deviation": 0.02,
+            "indicator_periods_candles": [
+                8,
+                16,
+                32
+            ]
+        },
+        "data_split_parameters": {
+            "test_size": 0.15,
+            "random_state": 1
+        },
+        "model_training_parameters": {
+            "n_estimators": 500,
+            "learning_rate": 0.02,
+            "max_depth": 5,
+            "num_leaves": 24,
+            "min_data_in_leaf": 50,
+            "min_split_gain": 0.01,
+            "reg_alpha": 0.5,
+            "reg_lambda": 1.0,
+            "subsample": 0.7,
+            "colsample_bytree": 0.7,
+            "bagging_freq": 5,
+            "extra_trees": true,
+            "verbose": -1
+        }
+    }
+}
