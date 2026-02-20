@@ -369,6 +369,15 @@ class RegimeHunterDiversified(IStrategy):
         return df
 
     # ------------------------------------------------------------------ #
+    #                          Leverage                                   #
+    # ------------------------------------------------------------------ #
+
+    def leverage(self, pair, current_time, current_rate, proposed_leverage,
+                 max_leverage, entry_tag, side, **kwargs) -> float:
+        """Apply leverage from config (capped at exchange max)."""
+        return min(proposed_leverage, max_leverage)
+
+    # ------------------------------------------------------------------ #
     #                    Initial Stake (25% for DCA)                      #
     # ------------------------------------------------------------------ #
 
@@ -494,29 +503,50 @@ class RegimeHunterDiversified(IStrategy):
         **kwargs,
     ) -> str | bool | None:
         """
-        1. Trailing exit: once +1% profit, trail 0.5% below peak
+        1. Proportional trailing exit: once +0.5% profit, trail a % below peak
         2. Unstucking: if stuck 48h+ and model flipped, exit
         """
-        # Initialize custom_info if needed
-        if not hasattr(trade, 'custom_info') or trade.custom_info is None:
-            trade.custom_info = {}
+        # --- Persistent max_profit tracking (survives restarts) ---
+        max_profit = trade.get_custom_data('max_profit', default=0.0)
 
-        # Track max profit for trailing
-        max_profit = trade.custom_info.get('max_profit', 0)
+        # Recovery fallback: reconstruct from DB-persisted max_rate/min_rate
+        # if custom_data doesn't exist yet (first run after code update)
+        if max_profit == 0.0 and current_profit > 0:
+            if trade.is_short and trade.min_rate is not None:
+                recovered = trade.calc_profit_ratio(trade.min_rate)
+            elif not trade.is_short and trade.max_rate is not None:
+                recovered = trade.calc_profit_ratio(trade.max_rate)
+            else:
+                recovered = 0.0
+            if recovered > max_profit:
+                max_profit = recovered
 
+        # Update only when max_profit increases (minimizes DB writes)
         if current_profit > max_profit:
-            trade.custom_info['max_profit'] = current_profit
             max_profit = current_profit
+            trade.set_custom_data('max_profit', max_profit)
 
-        # --- Trailing Exit ---
-        # Activate once we hit +0.5% profit, trail tighter to lock in gains faster
+        # --- Proportional Trailing Exit ---
+        # Trail distance scales with profit level:
+        #   0.5%-2% peak  -> give back 40% (keep 60%, lock small wins fast)
+        #   2%-5% peak    -> give back 30% (keep 70%)
+        #   5%+ peak      -> give back 25% (keep 75%, let big winners run)
         if max_profit >= 0.005:
-            # Trail 0.3% below peak
-            trail_threshold = max_profit - 0.003
+            if max_profit >= 0.05:
+                giveback_pct = 0.25
+            elif max_profit >= 0.02:
+                giveback_pct = 0.30
+            else:
+                giveback_pct = 0.40
+
+            trail_distance = max(max_profit * giveback_pct, 0.002)
+            trail_threshold = max_profit - trail_distance
+
             if current_profit <= trail_threshold:
                 logger.info(
                     f"Trailing exit for {trade.pair}: "
-                    f"max_profit={max_profit:.2%}, current={current_profit:.2%}"
+                    f"max_profit={max_profit:.2%}, current={current_profit:.2%}, "
+                    f"trail_at={trail_threshold:.2%} (giveback={giveback_pct:.0%})"
                 )
                 return "trailing_exit"
 

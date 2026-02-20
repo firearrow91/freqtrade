@@ -2,7 +2,7 @@
     "$schema": "https://schema.freqtrade.io/schema.json",
     "trading_mode": "futures",
     "margin_mode": "isolated",
-    "max_open_trades": 3,
+    "max_open_trades": 5,
     "position_adjustment_enable": true,
     "stake_currency": "USDT",
     "stake_amount": "unlimited",
@@ -65,6 +65,17 @@
             "method": "StaticPairList"
         }
     ],
+    "api_server": {
+        "enabled": true,
+        "listen_ip_address": "127.0.0.1",
+        "listen_port": 8081,
+        "verbosity": "error",
+        "enable_openapi": true,
+        "jwt_secret_key": "changethissecretkey",
+        "CORS_origins": ["http://localhost:3000"],
+        "username": "freqtrader",
+        "password": "changeme"
+    },
     "telegram": {
         "enabled": false,
         "token": "",
