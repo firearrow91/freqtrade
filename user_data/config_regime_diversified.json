@@ -96,7 +96,7 @@
         "enabled": true,
         "purge_old_models": 2,
         "train_period_days": 21,
-        "backtest_period_days": 3,
+        "backtest_period_days": 7,
         "identifier": "ml-regime-diversified-v2-trendfilter",
         "feature_parameters": {
             "include_timeframes": [

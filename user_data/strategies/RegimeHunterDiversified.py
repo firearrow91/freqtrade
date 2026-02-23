@@ -12,6 +12,11 @@ from technical import qtpylib
 from freqtrade.persistence import Trade
 from freqtrade.strategy import DecimalParameter, IntParameter, IStrategy
 
+try:
+    from bling_ai.decision_bridge import read_trade_conviction
+except ImportError:
+    read_trade_conviction = None  # BlingAI not installed
+
 
 logger = logging.getLogger(__name__)
 
@@ -435,6 +440,12 @@ class RegimeHunterDiversified(IStrategy):
         if filled_entries >= 4:
             return None
 
+        # Block DCA if conviction agent says no
+        if read_trade_conviction is not None:
+            conviction = read_trade_conviction(trade.id, trade.pair)
+            if conviction and not conviction.get("allow_dca", True):
+                return None
+
         # DCA levels: -1.5%, -3%, -4.5%
         dca_levels = [-0.015, -0.03, -0.045]
 
@@ -482,6 +493,14 @@ class RegimeHunterDiversified(IStrategy):
         """
         entries = trade.nr_of_successful_entries
 
+        # --- Conviction-based SL tightening ---
+        if read_trade_conviction is not None:
+            conviction = read_trade_conviction(trade.id, pair)
+            if conviction and conviction.get("tighten_sl") and conviction.get("suggested_sl") is not None:
+                suggested = float(conviction["suggested_sl"])
+                sl_ratio = (suggested - current_rate) / current_rate
+                return max(sl_ratio, -0.08)  # Never wider than -8%
+
         # Before all DCAs done: wide stop to let averaging work
         # After all DCAs: tighten to limit max loss
         if entries < 4:
@@ -503,9 +522,20 @@ class RegimeHunterDiversified(IStrategy):
         **kwargs,
     ) -> str | bool | None:
         """
-        1. Proportional trailing exit: once +0.5% profit, trail a % below peak
-        2. Unstucking: if stuck 48h+ and model flipped, exit
+        1. Conviction-based exit (BlingAI agent recommendation)
+        2. Proportional trailing exit: once +0.5% profit, trail a % below peak
+        3. Unstucking: if stuck 48h+ and model flipped, exit
         """
+        # --- Conviction-based exit ---
+        if read_trade_conviction is not None:
+            conviction = read_trade_conviction(trade.id, pair)
+            if conviction and conviction.get("action") == "exit" and conviction.get("conviction", 100) < 20:
+                logger.info(
+                    f"Conviction exit for {trade.pair}: "
+                    f"conviction={conviction.get('conviction')}, reason={conviction.get('reasoning', '')[:100]}"
+                )
+                return "conviction_exit"
+
         # --- Persistent max_profit tracking (survives restarts) ---
         max_profit = trade.get_custom_data('max_profit', default=0.0)
 
